@@ -1,4 +1,3 @@
-import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
@@ -18,14 +17,13 @@ public class MinesweeperGUI extends Canvas {
 
     public MinesweeperGUI(int width, int height, int numberOfMines) {
         super((width + 4) * TILE_SIZE, (height + 4) * TILE_SIZE);
-        game = new Minesweeper(width, height, numberOfMines);
-        reset();
-
-        // add button to reset
+        maxWidth(getWidth()); maxHeight(getHeight());
+        minWidth(getWidth()); minHeight(getHeight());
+        reset(width, height, numberOfMines);
 
         this.setOnMouseClicked(e -> {
             if(e.getX() > getWidth() - 100 && e.getY() > getHeight() - 50)
-                reset();
+                reset(game.getWidth(), game.getHeight(), game.getNumberOfMines());
 
             int r = (int) (e.getY() - TILE_SIZE) / TILE_SIZE;
             int c = (int) (e.getX() - TILE_SIZE * 2) / TILE_SIZE;
@@ -47,8 +45,8 @@ public class MinesweeperGUI extends Canvas {
         });
     }
 
-    public void reset() {
-        game = new Minesweeper(game.getWidth(), game.getHeight(), game.getNumberOfMines());
+    public void reset(int width, int height, int mines) {
+        game = new Minesweeper(width, height, mines);
         firstPlay = true;
         time = -1;
         justLost = false;
@@ -71,7 +69,7 @@ public class MinesweeperGUI extends Canvas {
         GraphicsContext gc = getGraphicsContext2D();
 
         // draw area/grid
-        gc.setFill(Color.GRAY);
+        gc.setFill(Color.LIGHTGRAY);
 //        gc.fillRect(TILE_SIZE * 2, TILE_SIZE, TILE_SIZE * game.getWidth(), TILE_SIZE * game.getHeight());
         gc.fillRect(0, 0, getWidth(), getHeight());
         gc.setFill(Color.DARKGRAY);
@@ -111,7 +109,7 @@ public class MinesweeperGUI extends Canvas {
         int x = (c + 2) * TILE_SIZE, y = (r + 1) * TILE_SIZE;
 
         if(game.hasRevealedTile(r, c)) {
-            gc.setFill(Color.LIGHTGRAY);
+            gc.setFill(Color.WHITESMOKE);
             gc.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
             int mines = game.getTile(r, c);
@@ -130,11 +128,12 @@ public class MinesweeperGUI extends Canvas {
 
     private Color getNumberColor(int num) {
         switch(num) {
-            default: return Color.BLACK;
+            default: return Color.BLACK; // unknown #s and 6s are black
             case 1: return Color.BLUE;
             case 2: return Color.GREEN;
             case 3: return Color.RED; // idk from here on out
-            case 4: return Color.VIOLET; // ??
+            case 4: return Color.VIOLET;
+            case 5: return Color.CORAL;
         }
     }
 }

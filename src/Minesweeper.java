@@ -63,7 +63,7 @@ public class Minesweeper {
         int bombs = 0;
         for(int i = 0; i < mineNumber.length; i++)
             for(int j = 0; j < mineNumber[i].length; j++)
-                if(hasFlaggedTile(i, j))
+                if(!hasRevealedTile(i, j) && hasFlaggedTile(i, j))
                     bombs++;
         return numberOfMines - bombs;
     }
@@ -100,8 +100,8 @@ public class Minesweeper {
 
     /**
      * Reveals adjacent tiles (including the one selected)
-     * @param r
-     * @param c
+     * @param r row
+     * @param c column
      */
     private void revealAdjacent(int r, int c) {
         for(int i = r - 1; i <= r + 1; i++)
