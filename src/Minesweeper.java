@@ -5,11 +5,18 @@ public class Minesweeper {
 
     private int numberOfMines;
 
+    private long startTimeMillis;
+
     private boolean hasLost; // if boom
+    private int timeAtLoss; // in seconds
 
     public Minesweeper(int width, int height, int numberOfMines) {
         mineNumber = new int[height][width];
         tileFlags = new byte[height][width];
+
+        startTimeMillis = -1;
+        hasLost = false;
+        timeAtLoss = -1;
 
         this.numberOfMines = numberOfMines;
 
@@ -24,8 +31,6 @@ public class Minesweeper {
         }
 
         putNumbersOnField();
-
-        hasLost = false;
     }
 
     private void putNumbersOnField() {
@@ -84,11 +89,20 @@ public class Minesweeper {
         if(r < 0 || r >= getHeight() || c < 0 || c >= getWidth() || hasRevealedTile(r, c))
             return -2; // error handling
 
+        if(startTimeMillis == -1) {
+            startTimeMillis = System.currentTimeMillis();
+        }
+
         tileFlags[r][c] |= 1;
         if(getTile(r, c) == 0) {
             revealAdjacent(r, c);
-        } else if(getTile(r, c) == -1)
+        } else if(getTile(r, c) == -1) {
             hasLost = true;
+            if(timeAtLoss == -1) { // if just lost
+                timeAtLoss = getCurrentPlayTime();
+                showAll();
+            }
+        }
         return mineNumber[r][c];
     }
 
@@ -112,9 +126,13 @@ public class Minesweeper {
 
     public void flagTile(int r, int c) {
         tileFlags[r][c] ^= 2;
+
+        if(startTimeMillis == -1) {
+            startTimeMillis = System.currentTimeMillis();
+        }
     }
 
-    public int getNumberOfMines() {
+    public int getTotalMines() {
         return numberOfMines;
     }
 
@@ -124,6 +142,20 @@ public class Minesweeper {
 
     public int getWidth() {
         return mineNumber[0].length;
+    }
+
+    public long getStartTimeMillis() {
+        return startTimeMillis;
+    }
+
+    public int getCurrentPlayTime() {
+        if(startTimeMillis == -1)
+            return 0;
+        return (int) (System.currentTimeMillis() - startTimeMillis) / 1000;
+    }
+
+    public long getTimeAtLoss() {
+        return timeAtLoss;
     }
 
     /**

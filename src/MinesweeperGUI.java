@@ -1,65 +1,152 @@
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Font;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 
 public class MinesweeperGUI extends Canvas {
 
-    public static final int TILE_SIZE = 25;
+    public static final Color RECT_COLOR = Color.BLACK;
+    public static final Color RECT_STRING_COLOR = Color.WHITE;
 
     private Minesweeper game;
 
-    private long time; // millis
-
-    private boolean firstPlay;
-
-    private boolean justLost;
+    private double tileSize;
+    private Font font;
+    private Rectangle resetRect;
+    private Rectangle changeGameRect;
 
     public MinesweeperGUI(int width, int height, int numberOfMines) {
-        super((width + 4) * TILE_SIZE, (height + 4) * TILE_SIZE);
-        maxWidth(getWidth()); maxHeight(getHeight());
-        minWidth(getWidth()); minHeight(getHeight());
-        reset(width, height, numberOfMines);
+        game = new Minesweeper(width, height, numberOfMines);
 
-        this.setOnMouseClicked(e -> {
-            if(e.getX() > getWidth() - 100 && e.getY() > getHeight() - 50)
-                reset(game.getWidth(), game.getHeight(), game.getNumberOfMines());
+        tileSize = 25; // initial tile size needed
+        font = new Font(0); // set in resize
+        resetRect = new Rectangle(); // set in resize
+        changeGameRect = new Rectangle(); // set in resize
 
-            int r = (int) (e.getY() - TILE_SIZE) / TILE_SIZE;
-            int c = (int) (e.getX() - TILE_SIZE * 2) / TILE_SIZE;
+        this.setOnMouseClicked(this::onMouseClicked);
 
-            if(r < 0 || r >= game.getHeight() || c < 0 || c >= game.getWidth())
-                return;
+        resize((width + 4) * tileSize, (height + 4) * tileSize);
+    }
 
-            if(e.getButton() == MouseButton.PRIMARY && !game.hasRevealedTile(r, c)) {
-                game.revealTile(r, c);
-                if(firstPlay) {
-                    firstPlay = false;
-                    time = System.currentTimeMillis();
+    private void onMouseClicked(MouseEvent e) {
+        if(resetRect.contains(e.getX(), e.getY()))
+            reset();
+        else if(changeGameRect.contains(e.getX(), e.getY()))
+            changeGame();
+
+        // FIXME: r, c wrong near the boundaries
+        int r = (int)((e.getY() - tileSize) / tileSize);
+        int c = (int)((e.getX() - tileSize * 2) / tileSize);
+
+        if(r < 0 || r >= game.getHeight() || c < 0 || c >= game.getWidth())
+            return;
+
+        if(e.getButton() == MouseButton.PRIMARY && !game.hasRevealedTile(r, c)) {
+            game.revealTile(r, c);
+        } else if(e.getButton() == MouseButton.SECONDARY) {
+            game.flagTile(r, c);
+        }
+
+        update();
+    }
+
+    @Override
+    public void resize(double width, double height) {
+        setWidth(width);
+        setHeight(height);
+        tileSize = (width > height ? height / (game.getHeight() + 4) : width / (game.getWidth() + 4));
+
+        font = new Font(tileSize / 2);
+
+        resetRect.setX(game.getWidth() * tileSize);
+        resetRect.setY(game.getHeight() * tileSize + tileSize);
+        resetRect.setWidth(tileSize * 2);
+        resetRect.setHeight(tileSize);
+
+        changeGameRect.setX((game.getWidth() - 3) * tileSize);
+        changeGameRect.setY(game.getHeight() * tileSize + tileSize);
+        changeGameRect.setWidth(tileSize * 2);
+        changeGameRect.setHeight(tileSize);
+    }
+
+    public void fitWindowToGame() {
+        Stage window = Main.getPrimaryStage();
+        window.setWidth((game.getWidth() + 4) * tileSize);
+        window.setHeight((game.getHeight() + 4) * tileSize);
+    }
+
+    public void reset() {
+        game = new Minesweeper(game.getWidth(), game.getHeight(), game.getTotalMines());
+    }
+
+    public void changeGame() {
+        // open gui for changing game values (w, h, # of mines)
+        Stage window = new Stage();
+
+        // set up the scene
+        SimpleStringProperty width = new SimpleStringProperty(game.getWidth() + "");
+        SimpleStringProperty height = new SimpleStringProperty(game.getHeight() + "");
+        SimpleStringProperty numBombs = new SimpleStringProperty(game.getTotalMines() + "");
+
+        TextArea textWidth = new TextArea(width.get());
+        TextArea textHeight = new TextArea(height.get());
+        TextArea textBombs = new TextArea(numBombs.get());
+
+        width.bind(textWidth.textProperty());
+        height.bind(textHeight.textProperty());
+        numBombs.bind(textBombs.textProperty());
+
+        // note: bad, but works
+        final ChangeListener<String> numOnly = (observable, oldValue, newValue) -> {
+                if (!newValue.matches("\\d*")) {
+                    textWidth.setText(newValue.replaceAll("[^\\d]", ""));
+                    textHeight.setText(newValue.replaceAll("[^\\d]", ""));
+                    textBombs.setText(newValue.replaceAll("[^\\d]", ""));
                 }
-            } else if(e.getButton() == MouseButton.SECONDARY) {
-                game.flagTile(r, c);
-            }
+        };
 
-            update();
+        textWidth.textProperty().addListener(numOnly);
+        textHeight.textProperty().addListener(numOnly);
+        textBombs.textProperty().addListener(numOnly);
+
+        // FIXME: bad ui look
+        StackPane group = new StackPane();
+        group.getChildren().addAll(
+                new HBox(textWidth, new Label(" x "),
+                        textHeight, new Label("Bombs: "), textBombs) /* stuff*/);
+
+        Scene scene = new Scene(group);
+
+        window.setTitle("Game Settings");
+        window.setScene(scene);
+
+        window.initModality(Modality.WINDOW_MODAL);
+        window.initOwner(Main.getPrimaryStage());
+
+        window.setX(Main.getPrimaryStage().getX() + Main.getPrimaryStage().getWidth());
+        window.setY(Main.getPrimaryStage().getY());
+        window.setWidth(200);
+        window.setHeight(100);
+
+        window.setOnCloseRequest(e -> {
+            game = new Minesweeper(Integer.parseInt(width.get()), Integer.parseInt(height.get()), Integer.parseInt(numBombs.get()));
+            fitWindowToGame();
         });
-    }
 
-    public void reset(int width, int height, int mines) {
-        game = new Minesweeper(width, height, mines);
-        firstPlay = true;
-        time = -1;
-        justLost = false;
-    }
+        window.showAndWait();
 
-    public long getStartTime() {
-        return time;
-    }
-
-    public int getTimePlaying() {
-        if(time == -1)
-            return 0;
-        return (int) (System.currentTimeMillis() - time) / 1000;
     }
 
     /**
@@ -67,63 +154,76 @@ public class MinesweeperGUI extends Canvas {
      */
     public void update() {
         GraphicsContext gc = getGraphicsContext2D();
+        gc.setFont(font);
 
+        drawGrid(gc);
+        drawTiles(gc);
+
+        // draw # of bombs left and other things at the bottom
+        gc.setFill(Color.BLACK);
+        // TODO: make this look better + put at the top of the screen
+        gc.fillText(game.bombsLeft() + (game.hasLost() ? " ;( " : " :) ") +
+                        (game.hasLost() ? game.getTimeAtLoss() : game.getCurrentPlayTime()),
+                tileSize * 2, resetRect.getY() + tileSize / 1.45);
+
+        drawRectWithString(gc, changeGameRect, "GAME");
+        drawRectWithString(gc, resetRect, "RESET");
+
+        gc.setFill(Color.BLACK);
+        if(game.hasLost()) {
+            gc.fillText("You Lose!", tileSize * 2, tileSize / 1.45);
+        } else if(game.hasWon()) {
+            gc.fillText("You Win!", tileSize * 2, tileSize / 1.45);
+        }
+    }
+
+    private void drawGrid(GraphicsContext gc) {
         // draw area/grid
         gc.setFill(Color.LIGHTGRAY);
-//        gc.fillRect(TILE_SIZE * 2, TILE_SIZE, TILE_SIZE * game.getWidth(), TILE_SIZE * game.getHeight());
         gc.fillRect(0, 0, getWidth(), getHeight());
         gc.setFill(Color.DARKGRAY);
         for(int x = 2; x <= (game.getWidth() + 2); x++) {
-            gc.strokeLine(x * TILE_SIZE, TILE_SIZE, x * TILE_SIZE, TILE_SIZE * (1 + game.getHeight()));
+            gc.strokeLine(x * tileSize, tileSize, x * tileSize, tileSize * (1 + game.getHeight()));
         }
 
         for(int y = 1; y <= game.getHeight() + 1; y++) {
-            gc.strokeLine(TILE_SIZE * 2, y * TILE_SIZE, TILE_SIZE * (2 + game.getWidth()), y * TILE_SIZE);
+            gc.strokeLine(tileSize * 2, y * tileSize, tileSize * (2 + game.getWidth()), y * tileSize);
         }
+    }
 
+    private void drawTiles(GraphicsContext gc) {
         // draw individual tiles
         for(int i = 0; i < game.getHeight(); i++)
             for(int j = 0; j < game.getWidth(); j++)
                 drawTile(gc, i, j);
-
-        // draw # of bombs left and other things at the bottom
-        gc.setFill(Color.BLACK);
-        gc.fillText(game.bombsLeft() + (game.hasLost() ? " ;( " : " :) ") + getTimePlaying(), TILE_SIZE * 2, getHeight() - TILE_SIZE * 2);
-
-        gc.fillRect(getWidth() - 100, getHeight() - 50, 100, 50);
-        gc.setFill(Color.WHITE);
-        gc.fillText("RESET", getWidth() - 80, getHeight() - 25);
-
-        if(game.hasLost()) {
-            if(!justLost) {
-                game.showAll();
-                justLost = true;
-            }
-            gc.fillText("You Lose!", TILE_SIZE * 2, 10);
-        } else if(game.hasWon()) {
-            gc.fillText("You Win!", TILE_SIZE * 2, 10);
-        }
     }
 
     private void drawTile(GraphicsContext gc, int r, int c) {
-        int x = (c + 2) * TILE_SIZE, y = (r + 1) * TILE_SIZE;
+        double x = (c + 2) * tileSize, y = (r + 1) * tileSize;
 
         if(game.hasRevealedTile(r, c)) {
             gc.setFill(Color.WHITESMOKE);
-            gc.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            gc.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
 
             int mines = game.getTile(r, c);
             if(mines == -1) {
                 gc.setFill(Color.BLACK);
-                gc.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                gc.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
             } else if(mines != 0) {
                 gc.setFill(getNumberColor(mines));
-                gc.fillText(mines + "", x + TILE_SIZE * 2 / 5f, y + TILE_SIZE / 2f);
+                gc.fillText(mines + "", x + tileSize * 2 / 5f, y + tileSize / 2f);
             }
         } else if(game.hasFlaggedTile(r, c)) {
             gc.setFill(Color.RED);
-            gc.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            gc.fillRect(x + 2, y + 2, tileSize - 4, tileSize - 4);
         }
+    }
+
+    private void drawRectWithString(GraphicsContext gc, Rectangle rect, String str) {
+        gc.setFill(RECT_COLOR);
+        gc.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+        gc.setFill(RECT_STRING_COLOR);
+        gc.fillText(str, rect.getX() + tileSize / 3.75, rect.getY() + tileSize / 1.45);
     }
 
     private Color getNumberColor(int num) {
