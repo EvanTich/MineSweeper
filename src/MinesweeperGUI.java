@@ -1,5 +1,6 @@
 import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.value.ChangeListener;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -8,17 +9,22 @@ import javafx.scene.control.TextArea;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 public class MinesweeperGUI extends Canvas {
 
+    public static final Color BACKGROUND_COLOR = Color.LIGHTGRAY;
+    public static final Color GRID_COLOR = Color.DARKGRAY;
     public static final Color RECT_COLOR = Color.BLACK;
     public static final Color RECT_STRING_COLOR = Color.WHITE;
+    public static final Color STRING_COLOR = Color.BLACK;
 
     private Minesweeper game;
 
@@ -46,9 +52,8 @@ public class MinesweeperGUI extends Canvas {
         else if(changeGameRect.contains(e.getX(), e.getY()))
             changeGame();
 
-        // FIXME: r, c wrong near the boundaries
-        int r = (int)((e.getY() - tileSize) / tileSize);
-        int c = (int)((e.getX() - tileSize * 2) / tileSize);
+        int r = (int)(e.getY() / tileSize) - 1;
+        int c = (int)(e.getX() / tileSize) - 2;
 
         if(r < 0 || r >= game.getHeight() || c < 0 || c >= game.getWidth())
             return;
@@ -100,32 +105,38 @@ public class MinesweeperGUI extends Canvas {
         SimpleStringProperty height = new SimpleStringProperty(game.getHeight() + "");
         SimpleStringProperty numBombs = new SimpleStringProperty(game.getTotalMines() + "");
 
-        TextArea textWidth = new TextArea(width.get());
-        TextArea textHeight = new TextArea(height.get());
-        TextArea textBombs = new TextArea(numBombs.get());
-
-        width.bind(textWidth.textProperty());
-        height.bind(textHeight.textProperty());
-        numBombs.bind(textBombs.textProperty());
-
-        // note: bad, but works
-        final ChangeListener<String> numOnly = (observable, oldValue, newValue) -> {
-                if (!newValue.matches("\\d*")) {
-                    textWidth.setText(newValue.replaceAll("[^\\d]", ""));
-                    textHeight.setText(newValue.replaceAll("[^\\d]", ""));
-                    textBombs.setText(newValue.replaceAll("[^\\d]", ""));
+        // TODO: move these stupid functions to actual functions
+        final Function<SimpleStringProperty, TextArea> textAreaMaker = p -> {
+            TextArea textArea = new TextArea(p.get());
+            textArea.setPrefSize(50, 25);
+            textArea.setMaxHeight(25);
+            p.bind(textArea.textProperty());
+            textArea.textProperty().addListener((o, oldVal, newVal) -> {
+                if (!newVal.matches("\\d*")) {
+                    textArea.setText(newVal.replaceAll("[^\\d]", ""));
                 }
+            });
+            return textArea;
         };
 
-        textWidth.textProperty().addListener(numOnly);
-        textHeight.textProperty().addListener(numOnly);
-        textBombs.textProperty().addListener(numOnly);
+        TextArea textWidth = textAreaMaker.apply(width);
+        TextArea textHeight = textAreaMaker.apply(height);
+        TextArea textBombs = textAreaMaker.apply(numBombs);
 
-        // FIXME: bad ui look
-        StackPane group = new StackPane();
+        final BiFunction<String, Integer, Label> labelMaker = (s, i) -> {
+            Label l = new Label(s);
+            l.setMinSize(i, 25);
+            l.setAlignment(Pos.CENTER);
+            return l;
+        };
+
+        HBox group = new HBox(5);
+        group.setPadding(new Insets(3));
         group.getChildren().addAll(
-                new HBox(textWidth, new Label(" x "),
-                        textHeight, new Label("Bombs: "), textBombs) /* stuff*/);
+                textWidth, labelMaker.apply(" by ", 25),
+                textHeight, labelMaker.apply(" grid with ", 65),
+                textBombs, labelMaker.apply(" bombs.", 50)
+        );
 
         Scene scene = new Scene(group);
 
@@ -137,8 +148,8 @@ public class MinesweeperGUI extends Canvas {
 
         window.setX(Main.getPrimaryStage().getX() + Main.getPrimaryStage().getWidth());
         window.setY(Main.getPrimaryStage().getY());
-        window.setWidth(200);
-        window.setHeight(100);
+        window.setWidth(350);
+        window.setHeight(75);
 
         window.setOnCloseRequest(e -> {
             game = new Minesweeper(Integer.parseInt(width.get()), Integer.parseInt(height.get()), Integer.parseInt(numBombs.get()));
@@ -160,16 +171,16 @@ public class MinesweeperGUI extends Canvas {
         drawTiles(gc);
 
         // draw # of bombs left and other things at the bottom
-        gc.setFill(Color.BLACK);
+        gc.setFill(STRING_COLOR);
         // TODO: make this look better + put at the top of the screen
         gc.fillText(game.bombsLeft() + (game.hasLost() ? " ;( " : " :) ") +
-                        (game.hasLost() ? game.getTimeAtLoss() : game.getCurrentPlayTime()),
+                        (game.hasLost() ? game.getTimeAtEnd() : game.getCurrentPlayTime()),
                 tileSize * 2, resetRect.getY() + tileSize / 1.45);
 
         drawRectWithString(gc, changeGameRect, "GAME");
         drawRectWithString(gc, resetRect, "RESET");
 
-        gc.setFill(Color.BLACK);
+        gc.setFill(STRING_COLOR);
         if(game.hasLost()) {
             gc.fillText("You Lose!", tileSize * 2, tileSize / 1.45);
         } else if(game.hasWon()) {
@@ -179,15 +190,17 @@ public class MinesweeperGUI extends Canvas {
 
     private void drawGrid(GraphicsContext gc) {
         // draw area/grid
-        gc.setFill(Color.LIGHTGRAY);
+        gc.setFill(BACKGROUND_COLOR);
         gc.fillRect(0, 0, getWidth(), getHeight());
-        gc.setFill(Color.DARKGRAY);
+        gc.setFill(GRID_COLOR);
         for(int x = 2; x <= (game.getWidth() + 2); x++) {
-            gc.strokeLine(x * tileSize, tileSize, x * tileSize, tileSize * (1 + game.getHeight()));
+            gc.strokeLine(x * tileSize, tileSize,
+                    x * tileSize, tileSize * (1 + game.getHeight()));
         }
 
         for(int y = 1; y <= game.getHeight() + 1; y++) {
-            gc.strokeLine(tileSize * 2, y * tileSize, tileSize * (2 + game.getWidth()), y * tileSize);
+            gc.strokeLine(tileSize * 2, y * tileSize,
+                    tileSize * (2 + game.getWidth()), y * tileSize);
         }
     }
 

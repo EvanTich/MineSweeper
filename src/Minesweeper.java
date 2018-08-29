@@ -8,7 +8,7 @@ public class Minesweeper {
     private long startTimeMillis;
 
     private boolean hasLost; // if boom
-    private int timeAtLoss; // in seconds
+    private int timeAtEnd; // in seconds
 
     public Minesweeper(int width, int height, int numberOfMines) {
         mineNumber = new int[height][width];
@@ -16,7 +16,7 @@ public class Minesweeper {
 
         startTimeMillis = -1;
         hasLost = false;
-        timeAtLoss = -1;
+        timeAtEnd = -1;
 
         this.numberOfMines = numberOfMines;
 
@@ -61,6 +61,8 @@ public class Minesweeper {
             for(int j = 0; j < mineNumber[i].length; j++)
                 if(!hasRevealedTile(i, j) && mineNumber[i][j] != -1)
                     return false;
+
+        timeAtEnd = getCurrentPlayTime();
         return true;
     }
 
@@ -98,8 +100,8 @@ public class Minesweeper {
             revealAdjacent(r, c);
         } else if(getTile(r, c) == -1) {
             hasLost = true;
-            if(timeAtLoss == -1) { // if just lost
-                timeAtLoss = getCurrentPlayTime();
+            if(timeAtEnd == -1) { // if just lost
+                timeAtEnd = getCurrentPlayTime();
                 showAll();
             }
         }
@@ -154,8 +156,8 @@ public class Minesweeper {
         return (int) (System.currentTimeMillis() - startTimeMillis) / 1000;
     }
 
-    public long getTimeAtLoss() {
-        return timeAtLoss;
+    public long getTimeAtEnd() {
+        return timeAtEnd;
     }
 
     /**
