@@ -153,10 +153,12 @@ public class Minesweeper {
     public int getCurrentPlayTime() {
         if(startTimeMillis == -1)
             return 0;
+        if(timeAtEnd != -1)
+            return getTimeAtEnd();
         return (int) (System.currentTimeMillis() - startTimeMillis) / 1000;
     }
 
-    public long getTimeAtEnd() {
+    public int getTimeAtEnd() {
         return timeAtEnd;
     }
 

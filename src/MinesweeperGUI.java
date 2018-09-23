@@ -10,13 +10,11 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 public class MinesweeperGUI extends Canvas {
 
@@ -25,6 +23,11 @@ public class MinesweeperGUI extends Canvas {
     public static final Color RECT_COLOR = Color.BLACK;
     public static final Color RECT_STRING_COLOR = Color.WHITE;
     public static final Color STRING_COLOR = Color.BLACK;
+
+    public static final Color FACE_COLOR = Color.YELLOW;
+    public static final Color FACE_FEATURE_COLOR = Color.BLACK;
+    public static final double FACE_SIZE_MULTIPLIER = .9;
+    public static final double EYE_SIZE_DIVISOR = 6;
 
     private Minesweeper game;
 
@@ -51,6 +54,9 @@ public class MinesweeperGUI extends Canvas {
             reset();
         else if(changeGameRect.contains(e.getX(), e.getY()))
             changeGame();
+
+        if(game.hasLost() || game.hasWon())
+            return;
 
         int r = (int)(e.getY() / tileSize) - 1;
         int c = (int)(e.getX() / tileSize) - 2;
@@ -105,37 +111,12 @@ public class MinesweeperGUI extends Canvas {
         SimpleStringProperty height = new SimpleStringProperty(game.getHeight() + "");
         SimpleStringProperty numBombs = new SimpleStringProperty(game.getTotalMines() + "");
 
-        // TODO: move these stupid functions to actual functions
-        final Function<SimpleStringProperty, TextArea> textAreaMaker = p -> {
-            TextArea textArea = new TextArea(p.get());
-            textArea.setPrefSize(50, 25);
-            textArea.setMaxHeight(25);
-            p.bind(textArea.textProperty());
-            textArea.textProperty().addListener((o, oldVal, newVal) -> {
-                if (!newVal.matches("\\d*")) {
-                    textArea.setText(newVal.replaceAll("[^\\d]", ""));
-                }
-            });
-            return textArea;
-        };
-
-        TextArea textWidth = textAreaMaker.apply(width);
-        TextArea textHeight = textAreaMaker.apply(height);
-        TextArea textBombs = textAreaMaker.apply(numBombs);
-
-        final BiFunction<String, Integer, Label> labelMaker = (s, i) -> {
-            Label l = new Label(s);
-            l.setMinSize(i, 25);
-            l.setAlignment(Pos.CENTER);
-            return l;
-        };
-
         HBox group = new HBox(5);
         group.setPadding(new Insets(3));
         group.getChildren().addAll(
-                textWidth, labelMaker.apply(" by ", 25),
-                textHeight, labelMaker.apply(" grid with ", 65),
-                textBombs, labelMaker.apply(" bombs.", 50)
+                newTextArea(width), newLabel(" by ", 25),
+                newTextArea(height), newLabel(" grid with ", 65),
+                newTextArea(numBombs), newLabel(" bombs.", 50)
         );
 
         Scene scene = new Scene(group);
@@ -148,8 +129,6 @@ public class MinesweeperGUI extends Canvas {
 
         window.setX(Main.getPrimaryStage().getX() + Main.getPrimaryStage().getWidth());
         window.setY(Main.getPrimaryStage().getY());
-        window.setWidth(350);
-        window.setHeight(75);
 
         window.setOnCloseRequest(e -> {
             game = new Minesweeper(Integer.parseInt(width.get()), Integer.parseInt(height.get()), Integer.parseInt(numBombs.get()));
@@ -158,6 +137,26 @@ public class MinesweeperGUI extends Canvas {
 
         window.showAndWait();
 
+    }
+
+    private TextArea newTextArea(SimpleStringProperty p) {
+        TextArea textArea = new TextArea(p.get());
+        textArea.setPrefSize(50, 20);
+        textArea.setMaxHeight(25);
+        p.bind(textArea.textProperty());
+        textArea.textProperty().addListener((o, oldVal, newVal) -> {
+            if (!newVal.matches("\\d*")) {
+                textArea.setText(newVal.replaceAll("[^\\d]", ""));
+            }
+        });
+        return textArea;
+    }
+
+    private Label newLabel(String s, int width) {
+        Label l = new Label(s);
+        l.setMinSize(width, 20);
+        l.setAlignment(Pos.CENTER);
+        return l;
     }
 
     /**
@@ -170,29 +169,33 @@ public class MinesweeperGUI extends Canvas {
         drawGrid(gc);
         drawTiles(gc);
 
-        // draw # of bombs left and other things at the bottom
+        // draw # of bombs left and other things
         gc.setFill(STRING_COLOR);
-        // TODO: make this look better + put at the top of the screen
-        gc.fillText(game.bombsLeft() + (game.hasLost() ? " ;( " : " :) ") +
-                        (game.hasLost() ? game.getTimeAtEnd() : game.getCurrentPlayTime()),
-                tileSize * 2, resetRect.getY() + tileSize / 1.45);
+        gc.fillText(String.format("%03d         %03d" , game.bombsLeft(), game.getCurrentPlayTime()), tileSize * 5.075, tileSize / 1.45);
+
+        if(game.hasLost()) {
+            gc.setFill(STRING_COLOR);
+            gc.fillText("You Lose!", tileSize * 2, tileSize / 1.45);
+            drawDeadFace(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2); // x and y are good enough
+        } else  {
+            drawSmile(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2);
+            if(game.hasWon()) {
+                gc.setFill(STRING_COLOR);
+                gc.fillText("You Win!", tileSize * 2, tileSize / 1.45);
+            }
+        }
+
+        drawWonFace(gc, 0, 0);
 
         drawRectWithString(gc, changeGameRect, "GAME");
         drawRectWithString(gc, resetRect, "RESET");
-
-        gc.setFill(STRING_COLOR);
-        if(game.hasLost()) {
-            gc.fillText("You Lose!", tileSize * 2, tileSize / 1.45);
-        } else if(game.hasWon()) {
-            gc.fillText("You Win!", tileSize * 2, tileSize / 1.45);
-        }
     }
 
     private void drawGrid(GraphicsContext gc) {
         // draw area/grid
         gc.setFill(BACKGROUND_COLOR);
         gc.fillRect(0, 0, getWidth(), getHeight());
-        gc.setFill(GRID_COLOR);
+        gc.setStroke(GRID_COLOR);
         for(int x = 2; x <= (game.getWidth() + 2); x++) {
             gc.strokeLine(x * tileSize, tileSize,
                     x * tileSize, tileSize * (1 + game.getHeight()));
@@ -214,6 +217,8 @@ public class MinesweeperGUI extends Canvas {
     private void drawTile(GraphicsContext gc, int r, int c) {
         double x = (c + 2) * tileSize, y = (r + 1) * tileSize;
 
+        // TODO: show wrongly flagged tiles if lost (won doesn't matter)
+
         if(game.hasRevealedTile(r, c)) {
             gc.setFill(Color.WHITESMOKE);
             gc.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
@@ -230,6 +235,67 @@ public class MinesweeperGUI extends Canvas {
             gc.setFill(Color.RED);
             gc.fillRect(x + 2, y + 2, tileSize - 4, tileSize - 4);
         }
+    }
+
+    private void drawSmile(GraphicsContext gc, double x, double y) {
+        // (:))
+
+        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER;
+        final double eyeSize = faceSize / EYE_SIZE_DIVISOR;
+        final double eyeLocationY = y + faceSize * 5 / 16;
+
+        gc.setFill(FACE_COLOR);
+        gc.fillArc(x, y, faceSize, faceSize, 0, 360, ArcType.ROUND); // face
+        gc.setFill(FACE_FEATURE_COLOR);
+        gc.fillArc(x + faceSize / 4 - eyeSize / 4, eyeLocationY, eyeSize, eyeSize,
+                0, 360, ArcType.ROUND); // left eye
+        gc.fillArc(x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize, eyeSize,
+                0, 360, ArcType.ROUND); // right eye
+        gc.setStroke(FACE_FEATURE_COLOR);
+        gc.strokeArc(x + faceSize / 4, y + faceSize * 5 / 8, faceSize / 2, faceSize / 6,
+                200, 135, ArcType.OPEN); // smile
+    }
+
+    private void drawDeadFace(GraphicsContext gc, double x, double y) {
+        // (X() two Xs
+
+        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER;
+        final double eyeSize = faceSize / EYE_SIZE_DIVISOR;
+        final double eyeLocationY  = y + faceSize * 5 / 16;
+
+        gc.setFill(FACE_COLOR);
+        gc.fillArc(x, y, faceSize, faceSize, 0, 360, ArcType.ROUND); // face
+        gc.setStroke(FACE_FEATURE_COLOR);
+        drawX(gc, x + faceSize / 4 - eyeSize / 4, eyeLocationY, eyeSize); // left eye
+        drawX(gc, x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize); // right eye
+        gc.strokeArc(x + faceSize / 4, y + faceSize * 3 / 4, faceSize / 2, faceSize / 6,
+                30, 135, ArcType.OPEN); // frown
+    }
+
+    private void drawX(GraphicsContext gc, double x, double y, double eyeSize) {
+        gc.strokeLine(x, y, x + eyeSize, y + eyeSize);
+        gc.strokeLine(x + eyeSize, y, x, y + eyeSize);
+    }
+
+    private void drawWonFace(GraphicsContext gc, double x, double y) {
+        // sunglasses boy with smile
+
+        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER * 10; // FIXME *10
+        final double eyeSize = faceSize / EYE_SIZE_DIVISOR;
+        final double eyeLocationY  = y + faceSize * 5 / 16;
+
+        // FIXME
+        gc.setFill(FACE_COLOR);
+        gc.fillArc(x, y, faceSize, faceSize, 0, 360, ArcType.ROUND); // face
+        gc.setFill(FACE_FEATURE_COLOR);
+        drawSunglass(gc, x + faceSize / 4 - eyeSize / 4, eyeLocationY, eyeSize);
+        drawSunglass(gc, x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize);
+    }
+
+    private void drawSunglass(GraphicsContext gc, double x, double y, double eyeSize) {
+        // FIXME
+        gc.fillRect(x, y, eyeSize, eyeSize / 2);
+        gc.fillArc(x, y + eyeSize / 2, eyeSize, eyeSize, 0, -180, ArcType.ROUND);
     }
 
     private void drawRectWithString(GraphicsContext gc, Rectangle rect, String str) {
