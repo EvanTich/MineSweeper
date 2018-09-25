@@ -20,6 +20,7 @@ public class MinesweeperGUI extends Canvas {
 
     public static final Color BACKGROUND_COLOR = Color.LIGHTGRAY;
     public static final Color GRID_COLOR = Color.DARKGRAY;
+    public static final double GRID_LINE_WIDTH = 1;
     public static final Color RECT_COLOR = Color.BLACK;
     public static final Color RECT_STRING_COLOR = Color.WHITE;
     public static final Color STRING_COLOR = Color.BLACK;
@@ -175,17 +176,15 @@ public class MinesweeperGUI extends Canvas {
 
         if(game.hasLost()) {
             gc.setFill(STRING_COLOR);
-            gc.fillText("You Lose!", tileSize * 2, tileSize / 1.45);
             drawDeadFace(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2); // x and y are good enough
         } else  {
-            drawSmile(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2);
             if(game.hasWon()) {
+                drawWonFace(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2);
                 gc.setFill(STRING_COLOR);
-                gc.fillText("You Win!", tileSize * 2, tileSize / 1.45);
+            } else {
+                drawSmile(gc, tileSize * 6 - tileSize * (FACE_SIZE_MULTIPLIER - 1), 2);
             }
         }
-
-        drawWonFace(gc, 0, 0);
 
         drawRectWithString(gc, changeGameRect, "GAME");
         drawRectWithString(gc, resetRect, "RESET");
@@ -196,6 +195,7 @@ public class MinesweeperGUI extends Canvas {
         gc.setFill(BACKGROUND_COLOR);
         gc.fillRect(0, 0, getWidth(), getHeight());
         gc.setStroke(GRID_COLOR);
+        gc.setLineWidth(GRID_LINE_WIDTH);
         for(int x = 2; x <= (game.getWidth() + 2); x++) {
             gc.strokeLine(x * tileSize, tileSize,
                     x * tileSize, tileSize * (1 + game.getHeight()));
@@ -217,17 +217,20 @@ public class MinesweeperGUI extends Canvas {
     private void drawTile(GraphicsContext gc, int r, int c) {
         double x = (c + 2) * tileSize, y = (r + 1) * tileSize;
 
-        // TODO: show wrongly flagged tiles if lost (won doesn't matter)
-
         if(game.hasRevealedTile(r, c)) {
             gc.setFill(Color.WHITESMOKE);
             gc.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
 
             int mines = game.getTile(r, c);
-            if(mines == -1) {
+            if(mines == -1) { // if there is a mine
                 gc.setFill(Color.BLACK);
                 gc.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
             } else if(mines != 0) {
+                if(game.hasFlaggedTile(r, c) && game.hasLost()) {
+                    // show x
+                    drawX(gc, x + 4, y + 4, tileSize - 8);
+                }
+
                 gc.setFill(getNumberColor(mines));
                 gc.fillText(mines + "", x + tileSize * 2 / 5f, y + tileSize / 2f);
             }
@@ -252,6 +255,7 @@ public class MinesweeperGUI extends Canvas {
         gc.fillArc(x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize, eyeSize,
                 0, 360, ArcType.ROUND); // right eye
         gc.setStroke(FACE_FEATURE_COLOR);
+        gc.setLineWidth(faceSize / 60);
         gc.strokeArc(x + faceSize / 4, y + faceSize * 5 / 8, faceSize / 2, faceSize / 6,
                 200, 135, ArcType.OPEN); // smile
     }
@@ -268,34 +272,51 @@ public class MinesweeperGUI extends Canvas {
         gc.setStroke(FACE_FEATURE_COLOR);
         drawX(gc, x + faceSize / 4 - eyeSize / 4, eyeLocationY, eyeSize); // left eye
         drawX(gc, x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize); // right eye
+        gc.setLineWidth(faceSize / 60);
         gc.strokeArc(x + faceSize / 4, y + faceSize * 3 / 4, faceSize / 2, faceSize / 6,
                 30, 135, ArcType.OPEN); // frown
     }
 
-    private void drawX(GraphicsContext gc, double x, double y, double eyeSize) {
-        gc.strokeLine(x, y, x + eyeSize, y + eyeSize);
-        gc.strokeLine(x + eyeSize, y, x, y + eyeSize);
+    private void drawX(GraphicsContext gc, double x, double y, double size) {
+        gc.strokeLine(x, y, x + size, y + size);
+        gc.strokeLine(x + size, y, x, y + size);
     }
 
     private void drawWonFace(GraphicsContext gc, double x, double y) {
         // sunglasses boy with smile
 
-        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER * 10; // FIXME *10
+        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER;
         final double eyeSize = faceSize / EYE_SIZE_DIVISOR;
         final double eyeLocationY  = y + faceSize * 5 / 16;
 
-        // FIXME
         gc.setFill(FACE_COLOR);
         gc.fillArc(x, y, faceSize, faceSize, 0, 360, ArcType.ROUND); // face
         gc.setFill(FACE_FEATURE_COLOR);
-        drawSunglass(gc, x + faceSize / 4 - eyeSize / 4, eyeLocationY, eyeSize);
-        drawSunglass(gc, x + faceSize * 3 / 4 - eyeSize * 3 / 4, eyeLocationY, eyeSize);
+        drawSunglass(gc, x + faceSize * 0.2 - eyeSize / 4, eyeLocationY, eyeSize, true);
+        drawSunglass(gc, x + faceSize * 0.7 - eyeSize * 3 / 4, eyeLocationY, eyeSize, false);
+        gc.fillRect(x + faceSize * 0.2, eyeLocationY, eyeSize * 3, eyeSize / 10); // sunglasses middle top
+        gc.fillRect(x + faceSize * 0.2, eyeLocationY + eyeSize / 5, eyeSize * 3, eyeSize / 10); // sunglasses middle bottom
+        gc.setStroke(FACE_FEATURE_COLOR);
+        gc.setLineWidth(faceSize / 60);
+        gc.strokeLine(x, y + faceSize / 2, x + faceSize * 0.2 - eyeSize / 4, eyeLocationY * 1.0495); // left ear thing
+        gc.strokeLine(x + faceSize, y + faceSize / 2,
+                x + faceSize * 0.7 + eyeSize * 3 / 4, eyeLocationY * 1.0495); // right ear thing
+
+        gc.strokeArc(x + faceSize / 4, y + faceSize * 5 / 8, faceSize / 2, faceSize / 6,
+                200, 135, ArcType.OPEN); // smile
     }
 
-    private void drawSunglass(GraphicsContext gc, double x, double y, double eyeSize) {
-        // FIXME
-        gc.fillRect(x, y, eyeSize, eyeSize / 2);
-        gc.fillArc(x, y + eyeSize / 2, eyeSize, eyeSize, 0, -180, ArcType.ROUND);
+    private void drawSunglass(GraphicsContext gc, double x, double y, double eyeSize, boolean left) {
+        // stupid, complex sunglasses...
+        if(left) {
+            gc.fillRect(x, y, eyeSize / 2, eyeSize / 3 + 1);
+            gc.fillArc(x, y - eyeSize / 3, eyeSize, eyeSize * 4 / 3, 180, 90, ArcType.ROUND);
+            gc.fillArc(x - eyeSize / 2 - 1, y - eyeSize, eyeSize * 2 + 1, eyeSize * 2, 270, 90, ArcType.ROUND);
+        } else {
+            gc.fillArc(x, y - eyeSize, eyeSize * 2 + 1, eyeSize * 2, 180, 90, ArcType.ROUND);
+            gc.fillRect(x + eyeSize, y, eyeSize / 2, eyeSize /3 + 1);
+            gc.fillArc(x + eyeSize / 2, y - eyeSize / 3, eyeSize, eyeSize * 4 / 3, 270, 90, ArcType.ROUND);
+        }
     }
 
     private void drawRectWithString(GraphicsContext gc, Rectangle rect, String str) {
