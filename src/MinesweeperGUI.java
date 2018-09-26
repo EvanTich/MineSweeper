@@ -285,7 +285,7 @@ public class MinesweeperGUI extends Canvas {
     private void drawWonFace(GraphicsContext gc, double x, double y) {
         // sunglasses boy with smile
 
-        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER;
+        final double faceSize = tileSize * FACE_SIZE_MULTIPLIER * 10;
         final double eyeSize = faceSize / EYE_SIZE_DIVISOR;
         final double eyeLocationY  = y + faceSize * 5 / 16;
 
@@ -294,8 +294,7 @@ public class MinesweeperGUI extends Canvas {
         gc.setFill(FACE_FEATURE_COLOR);
         drawSunglass(gc, x + faceSize * 0.2 - eyeSize / 4, eyeLocationY, eyeSize, true);
         drawSunglass(gc, x + faceSize * 0.7 - eyeSize * 3 / 4, eyeLocationY, eyeSize, false);
-        gc.fillRect(x + faceSize * 0.2, eyeLocationY, eyeSize * 3, eyeSize / 10); // sunglasses middle top
-        gc.fillRect(x + faceSize * 0.2, eyeLocationY + eyeSize / 5, eyeSize * 3, eyeSize / 10); // sunglasses middle bottom
+        gc.fillRect(x + faceSize * 0.2, eyeLocationY, eyeSize * 3, eyeSize / 8); // sunglasses middle
         gc.setStroke(FACE_FEATURE_COLOR);
         gc.setLineWidth(faceSize / 60);
         gc.strokeLine(x, y + faceSize / 2, x + faceSize * 0.2 - eyeSize / 4, eyeLocationY * 1.0495); // left ear thing
